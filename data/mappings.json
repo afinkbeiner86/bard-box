@@ -1,0 +1,52 @@
+{
+    "slots": [
+        {
+            "id": 1,
+            "label": "Slot 1",
+            "filename": null,
+            "icon": null
+        },
+        {
+            "id": 2,
+            "label": "Slot 2",
+            "filename": null,
+            "icon": null
+        },
+        {
+            "id": 3,
+            "label": "Slot 3",
+            "filename": null,
+            "icon": null
+        },
+        {
+            "id": 4,
+            "label": "Slot 4",
+            "filename": null,
+            "icon": null
+        },
+        {
+            "id": 5,
+            "label": "Slot 5",
+            "filename": null,
+            "icon": null
+        },
+        {
+            "id": 6,
+            "label": "Slot 6",
+            "filename": null,
+            "icon": null
+        },
+        {
+            "id": 7,
+            "label": "Slot 7",
+            "filename": null,
+            "icon": null
+        },
+        {
+            "id": 8,
+            "label": "Slot 8",
+            "filename": null,
+            "icon": null
+        }
+    ]
+}

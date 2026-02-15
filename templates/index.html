@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{ title }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <button class="stop-bar" onclick="stopAll()">HALT ENCHANTMENT</button>
+    <div id="board" class="grid"></div>
+    <button class="mgmt-toggle" onclick="toggleDrawer()">📜 MANAGE</button>
+
+    <div id="drawer" class="drawer">
+        <div class="volume-container">
+            <span class="volume-label">Enchantment Potency (Volume)</span>
+            <input type="range" class="volume-slider" min="0" max="1" step="0.05" value="1"
+                oninput="setVolume(this.value)">
+        </div>
+
+        <div class="tab-nav">
+            <button id="tab-btn-music" class="active" onclick="switchTab('music')">Sounds</button>
+            <button id="tab-btn-icons" onclick="switchTab('icons')">Icons</button>
+        </div>
+        <div id="pane-music">
+            <label class="upload-zone" id="drop-music">
+                <input type="file" id="input-music" hidden onchange="upload('music')">
+                <div style="font-family:'Cinzel'; color:var(--gold);">Add Sound</div>
+                <div style="font-size:0.7rem; color:#666;">Click or Drag Sound Here</div>
+            </label>
+            <div id="list-music"></div>
+        </div>
+        <div id="pane-icons" style="display:none;">
+            <label class="upload-zone" id="drop-icons">
+                <input type="file" id="input-icon" hidden onchange="upload('icons')">
+                <div style="font-family:'Cinzel'; color:var(--gold);">Add Icon</div>
+                <div style="font-size:0.7rem; color:#666;">Click or Drag Image Here</div>
+            </label>
+            <div id="list-icons"></div>
+        </div>
+    </div>
+
+    <script>
+        let mapping = { type: null, value: null }, activeSlotId = null;
+
+        async function setVolume(val) { await fetch(`/api/volume/${val}`); }
+
+        async function refresh() {
+            const res = await fetch('/api/data');
+            const data = await res.json();
+
+            document.getElementById('board').innerHTML = data.slots.map(s => `
+                <div class="slot ${s.id === activeSlotId ? 'playing' : ''}" style="background-image: ${s.icon ? `url('/static/icons/${s.icon}')` : 'none'}" onclick="handleInteraction(${s.id}, '${s.filename}')">
+                    ${(s.filename || s.icon) ? `<button class="unmap-btn" onclick="event.stopPropagation(); unmap(${s.id})">×</button>` : ''}
+                    <div class="slot-content"><strong>${s.label}</strong><small>${s.filename || '---'}</small></div>
+                </div>`).join('');
+
+            const renderAsset = (type, list) => list.map(item => `
+                <div class="asset-card">
+                    <div class="asset-info">
+                        ${type === 'icons' ? `<img src="/static/icons/${item}">` : ''}
+                        <span>${item}</span>
+                    </div>
+                    <div class="btn-group">
+                        <button class="map-btn" onclick="startMap('${type}', '${item}')">MAP TO GRID</button>
+                        <button onclick="renameAsset('${type}', '${item}')">✏️</button>
+                        <button class="del-btn" onclick="deleteAsset('${type}', '${item}')">×</button>
+                    </div>
+                </div>`).join('');
+
+            document.getElementById('list-music').innerHTML = renderAsset('music', data.music);
+            document.getElementById('list-icons').innerHTML = renderAsset('icons', data.icons);
+
+            setupDragDrop('drop-music', 'music'); setupDragDrop('drop-icons', 'icons');
+        }
+
+        function setupDragDrop(id, type) {
+            const zone = document.getElementById(id);
+            if (!zone) return;
+            ['dragover', 'drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
+            zone.ondrop = async (e) => {
+                const fd = new FormData(); fd.append('file', e.dataTransfer.files[0]);
+                await fetch(`/api/upload_${type === 'music' ? 'music' : 'icon'}`, { method: 'POST', body: fd });
+                refresh();
+            };
+        }
+
+        async function renameAsset(type, oldName) {
+            const base = oldName.includes('.') ? oldName.split('.').slice(0, -1).join('.') : oldName;
+            const newBase = prompt(`Rename "${oldName}" to:`, base);
+            if (!newBase || newBase.trim() === "" || newBase === base) return;
+            await fetch('/api/rename_asset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ old_name: oldName, new_name: newBase.trim(), type: type }) });
+            refresh();
+        }
+
+        function startMap(type, value) { mapping = { type, value }; toggleDrawer(); }
+
+        async function handleInteraction(slotId, filename) {
+            if (mapping.type) {
+                let body = { slot_id: slotId };
+                if (mapping.type === 'music') {
+                    const label = prompt("Label:", mapping.value.split('.')[0]);
+                    if (!label) return;
+                    body.filename = mapping.value; body.label = label;
+                } else { body.icon = mapping.value; }
+                await fetch('/api/map', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                mapping = { type: null, value: null }; refresh();
+            } else if (filename && filename !== 'null') {
+                activeSlotId = slotId; fetch('/api/play/' + filename); refresh();
+            }
+        }
+
+        async function upload(type) {
+            const input = document.getElementById(type === 'music' ? 'input-music' : 'input-icon');
+            if (!input.files[0]) return;
+            const fd = new FormData(); fd.append('file', input.files[0]);
+            await fetch(`/api/upload_${type === 'music' ? 'music' : 'icon'}`, { method: 'POST', body: fd });
+            refresh();
+        }
+
+        async function deleteAsset(type, filename) { if (confirm("Banish this artifact?")) { await fetch('/api/delete_asset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename, type }) }); refresh(); } }
+        function switchTab(tab) {
+            document.getElementById('pane-music').style.display = tab === 'music' ? 'block' : 'none';
+            document.getElementById('pane-icons').style.display = tab === 'icons' ? 'block' : 'none';
+            document.getElementById('tab-btn-music').classList.toggle('active', tab === 'music');
+            document.getElementById('tab-btn-icons').classList.toggle('active', tab === 'icons');
+        }
+        function toggleDrawer() { document.getElementById('drawer').classList.toggle('open'); }
+        async function unmap(id) { if (activeSlotId === id) activeSlotId = null; await fetch(`/api/unmap/${id}`, { method: 'POST' }); refresh(); }
+        function stopAll() { fetch('/api/stop'); activeSlotId = null; refresh(); }
+        refresh();
+    </script>
+</body>
+
+</html>

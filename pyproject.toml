@@ -1,0 +1,10 @@
+[project]
+  name = "bard-box"
+  version = "0.1.0"
+  description = "Web-based soundboard utilizing a Flask backend and Pygame-integrated mixer for real-time local audio playback and dynamic asset mapping."
+  readme = "README.md"
+  requires-python = ">=3.13"
+  dependencies = [
+    "flask>=3.1.2",
+    "pygame>=2.6.1"
+  ]
